@@ -1,4 +1,5 @@
 import Report from '../models/Report.js';
+import Session from '../models/Session.js';
 
 /**
  * Gets all completed assessment reports.

@@ -3,11 +3,12 @@ import mongoose from 'mongoose';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
+// Load environment variables
+dotenv.config();
+
 import interviewRoutes from './routes/interviewRoutes.js';
 import assessmentRoutes from './routes/assessmentRoutes.js';
 
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;

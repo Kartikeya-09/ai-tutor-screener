@@ -1,5 +1,6 @@
 import Session from '../models/Session.js';
-import { getNextQuestion } from '../services/claudeService.js';
+import Report from '../models/Report.js';
+import { getNextQuestion, generateReport } from '../services/geminiService.js';
 
 /**
  * Starts a new interview session.
@@ -12,7 +13,8 @@ export const startInterview = async (req, res) => {
   }
 
   try {
-    const firstQuestion = await getNextQuestion([], 0);
+    // Use the simple function for now
+        const firstQuestion = await getNextQuestion([], 0); 
 
     const newSession = new Session({
       candidateName,
@@ -53,16 +55,35 @@ export const handleResponse = async (req, res) => {
     session.conversation.push({ role: 'user', content: transcript });
 
     const nextQuestionIndex = session.currentQuestionIndex + 1;
-    const nextQuestion = await getNextQuestion(session.conversation, nextQuestionIndex);
+    // Use the simple function for now
+        const nextQuestion = await getNextQuestion(session.conversation, nextQuestionIndex); 
 
     let isComplete = false;
+    let reportId = null;
+
     if (nextQuestion) {
+      // Continue the interview
       session.conversation.push({ role: 'assistant', content: nextQuestion });
       session.currentQuestionIndex = nextQuestionIndex;
     } else {
+      // Interview is complete, generate the report
       session.status = 'completed';
       session.completedAt = new Date();
       isComplete = true;
+
+      console.log('Interview complete. Generating assessment report...');
+      const reportData = await generateReport(session.conversation);
+
+      const newReport = new Report({
+        sessionId: session._id,
+        candidateName: session.candidateName,
+        ...reportData,
+      });
+
+      await newReport.save();
+      reportId = newReport._id;
+      session.reportId = reportId;
+      console.log(`Report ${reportId} generated and saved for session ${session._id}`);
     }
 
     await session.save();
@@ -70,40 +91,11 @@ export const handleResponse = async (req, res) => {
     res.status(200).json({
       nextQuestion: nextQuestion,
       isComplete: isComplete,
+      reportId: reportId, // Send back the new report ID
     });
   } catch (error) {
     console.error('Error handling response:', error);
     res.status(500).json({ message: 'Failed to handle response.' });
-  }
-};
-
-/**
- * Marks the interview as complete and triggers assessment.
- */
-export const completeInterview = async (req, res) => {
-  const { sessionId } = req.body;
-
-  if (!sessionId) {
-    return res.status(400).json({ message: 'Session ID is required.' });
-  }
-
-  try {
-    const session = await Session.findById(sessionId);
-
-    if (!session) {
-      return res.status(404).json({ message: 'Session not found.' });
-    }
-
-    // In a real application, this would trigger a background job
-    // to generate the assessment. For now, we'll just log it.
-    console.log(`Assessment generation triggered for session: ${sessionId}`);
-
-    // The reportId will be created when the assessment is actually generated.
-    // For now, we'll return a placeholder.
-    res.status(200).json({ message: 'Assessment generation initiated.', reportId: null });
-  } catch (error) {
-    console.error('Error completing interview:', error);
-    res.status(500).json({ message: 'Failed to complete interview.' });
   }
 };
 
