@@ -22,6 +22,24 @@ app.use(express.json());
 app.use('/api/interview', interviewRoutes);
 app.use('/api/assessment', assessmentRoutes);
 
+// Health check route
+app.get('/api/healthcheck', (req, res) => {
+  const dbState = mongoose.connection.readyState;
+  let dbStatus = 'Disconnected';
+  if (dbState === 1) {
+    dbStatus = 'Connected';
+  } else if (dbState === 2) {
+    dbStatus = 'Connecting';
+  } else if (dbState === 3) {
+    dbStatus = 'Disconnecting';
+  }
+  
+  res.status(200).json({
+    server: 'Running',
+    database: dbStatus,
+  });
+});
+
 app.get('/', (req, res) => {
   res.send('AI Tutor Screener API is running...');
 });

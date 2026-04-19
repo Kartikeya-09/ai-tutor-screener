@@ -20,12 +20,6 @@ const sessionSchema = new mongoose.Schema({
       content: String,
     },
   ],
-  audioBlobs: [
-    {
-      questionIndex: Number,
-      transcript: String,
-    },
-  ],
   currentQuestionIndex: {
     type: Number,
     default: 0,
@@ -45,4 +39,4 @@ const sessionSchema = new mongoose.Schema({
 
 const Session = mongoose.model('Session', sessionSchema);
 
-module.exports = Session;
+export default Session;
