@@ -106,3 +106,23 @@ export const completeInterview = async (req, res) => {
     res.status(500).json({ message: 'Failed to complete interview.' });
   }
 };
+
+/**
+ * Gets a session by its ID.
+ */
+export const getSession = async (req, res) => {
+  const { sessionId } = req.params;
+
+  try {
+    const session = await Session.findById(sessionId);
+
+    if (!session) {
+      return res.status(404).json({ message: 'Session not found.' });
+    }
+
+    res.status(200).json(session);
+  } catch (error) {
+    console.error('Error getting session:', error);
+    res.status(500).json({ message: 'Failed to get session.' });
+  }
+};

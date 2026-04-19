@@ -35,3 +35,16 @@ export const getReportById = async (req, res) => {
     res.status(500).json({ message: 'Failed to fetch report.' });
   }
 };
+
+/**
+ * Gets all sessions for the admin dashboard.
+ */
+export const getAllSessions = async (req, res) => {
+  try {
+    const sessions = await Session.find().sort({ startedAt: -1 });
+    res.status(200).json(sessions);
+  } catch (error) {
+    console.error('Error getting all sessions:', error);
+    res.status(500).json({ message: 'Failed to get sessions.' });
+  }
+};
