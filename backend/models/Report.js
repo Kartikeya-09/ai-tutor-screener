@@ -26,22 +26,27 @@ const reportSchema = new mongoose.Schema({
     clarity: {
       score: { type: Number, min: 1, max: 10 },
       evidence: String,
+      quote: String,
     },
     warmth: {
       score: { type: Number, min: 1, max: 10 },
       evidence: String,
+      quote: String,
     },
     simplicity: {
       score: { type: Number, min: 1, max: 10 },
       evidence: String,
+      quote: String,
     },
     patience: {
       score: { type: Number, min: 1, max: 10 },
       evidence: String,
+      quote: String,
     },
     fluency: {
       score: { type: Number, min: 1, max: 10 },
       evidence: String,
+      quote: String,
     },
   },
   fullTranscript: {
@@ -49,6 +54,9 @@ const reportSchema = new mongoose.Schema({
   },
   strengths: [String],
   areasOfConcern: [String],
+  summary: {
+    type: String,
+  },
   createdAt: {
     type: Date,
     default: Date.now,

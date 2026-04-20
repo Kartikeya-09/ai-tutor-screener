@@ -6,7 +6,10 @@ import { getCandidateAuth } from '@/lib/authStorage';
 
 const useSpeechRecognition = ({ onResult, onEnd }) => {
   const recognition = useRef(null);
+  const shouldCapture = useRef(false);
+  const stopRequested = useRef(false);
   const [isListening, setIsListening] = useState(false);
+  const [isCaptureMode, setIsCaptureMode] = useState(false);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -16,7 +19,7 @@ const useSpeechRecognition = ({ onResult, onEnd }) => {
 
     recognition.current = new SpeechRecognition();
     const rec = recognition.current;
-    rec.continuous = false;
+    rec.continuous = true;
     rec.interimResults = true;
     rec.lang = 'en-US';
 
@@ -29,7 +32,26 @@ const useSpeechRecognition = ({ onResult, onEnd }) => {
 
     rec.onend = () => {
       setIsListening(false);
-      if (onEnd) onEnd();
+
+      if (stopRequested.current) {
+        stopRequested.current = false;
+        setIsCaptureMode(false);
+        if (onEnd) onEnd();
+        return;
+      }
+
+      // Browser speech recognition can stop on short silence; auto-restart while user is in answer mode.
+      if (shouldCapture.current) {
+        window.setTimeout(() => {
+          if (!recognition.current || !shouldCapture.current) return;
+          try {
+            recognition.current.start();
+            setIsListening(true);
+          } catch {
+            // Ignore restart race conditions.
+          }
+        }, 250);
+      }
     };
 
     rec.onerror = () => {
@@ -42,40 +64,57 @@ const useSpeechRecognition = ({ onResult, onEnd }) => {
   }, [onResult, onEnd]);
 
   const startListening = () => {
-    if (recognition.current && !isListening) {
-      recognition.current.start();
-      setIsListening(true);
+    if (recognition.current && !shouldCapture.current) {
+      shouldCapture.current = true;
+      stopRequested.current = false;
+      setIsCaptureMode(true);
+      try {
+        recognition.current.start();
+        setIsListening(true);
+      } catch {
+        setIsListening(false);
+      }
     }
   };
 
   const stopListening = () => {
-    if (recognition.current && isListening) {
+    if (recognition.current && (isListening || shouldCapture.current)) {
+      shouldCapture.current = false;
+      stopRequested.current = true;
+      setIsCaptureMode(false);
       recognition.current.stop();
       setIsListening(false);
     }
   };
 
-  return { isListening, startListening, stopListening };
+  return { isListening, isCaptureMode, startListening, stopListening };
 };
 
 export default function InterviewPage() {
   const router = useRouter();
+  const startListeningTimeoutRef = useRef(null);
   const [candidateToken, setCandidateToken] = useState('');
   const [session, setSession] = useState(null);
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [transcript, setTranscript] = useState('');
+  const [isPreparingToListen, setIsPreparingToListen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [questionIndex, setQuestionIndex] = useState(0);
 
   const TOTAL_QUESTIONS = 6;
+  const THINKING_GAP_MS = 1800;
 
   const speak = (text) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.onend = () => {
-      startListening();
+      setIsPreparingToListen(true);
+      startListeningTimeoutRef.current = window.setTimeout(() => {
+        setIsPreparingToListen(false);
+        startListening();
+      }, THINKING_GAP_MS);
     };
     window.speechSynthesis.speak(utterance);
   };
@@ -90,10 +129,18 @@ export default function InterviewPage() {
     }
   };
 
-  const { isListening, startListening, stopListening } = useSpeechRecognition({
+  const { isListening, isCaptureMode, startListening, stopListening } = useSpeechRecognition({
     onResult: handleSpeechResult,
     onEnd: handleSpeechEnd,
   });
+
+  useEffect(() => {
+    return () => {
+      if (startListeningTimeoutRef.current) {
+        window.clearTimeout(startListeningTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     const auth = getCandidateAuth();
@@ -176,7 +223,7 @@ export default function InterviewPage() {
             <h1 className="mt-1 text-3xl font-bold text-slate-900 sm:text-4xl">Question {questionIndex} of {TOTAL_QUESTIONS}</h1>
           </div>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-            {isLoading ? 'Processing' : isListening ? 'Listening' : 'Ready'}
+            {isLoading ? 'Processing' : isPreparingToListen ? 'Preparing' : isCaptureMode ? 'Listening' : 'Ready'}
           </span>
         </div>
 
@@ -187,13 +234,13 @@ export default function InterviewPage() {
 
         <div className="mt-7 grid gap-6 lg:grid-cols-[180px_1fr] lg:items-start">
           <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white p-5">
-            <div className={`flex h-24 w-24 items-center justify-center rounded-full ${isListening ? 'bg-rose-500 animate-pulse' : 'bg-sky-100'}`}>
-              <svg className={`h-10 w-10 ${isListening ? 'text-white' : 'text-sky-700'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className={`flex h-24 w-24 items-center justify-center rounded-full ${isCaptureMode ? 'bg-rose-500 animate-pulse' : 'bg-sky-100'}`}>
+              <svg className={`h-10 w-10 ${isCaptureMode ? 'text-white' : 'text-sky-700'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
               </svg>
             </div>
             <p className="mt-4 text-center text-sm font-medium text-slate-600">
-              {isListening ? 'Voice capture is active' : 'Tap below to respond'}
+              {isPreparingToListen ? 'Take a moment, recording will start shortly' : isCaptureMode ? 'Voice capture is active' : 'Tap below to respond'}
             </p>
           </div>
 
@@ -202,11 +249,11 @@ export default function InterviewPage() {
               <p className="text-sm font-semibold uppercase tracking-wider text-slate-500">Live Transcript</p>
               <button
                 type="button"
-                onClick={isListening ? stopListening : startListening}
+                onClick={isCaptureMode ? stopListening : startListening}
                 className="rounded-full bg-sky-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                 disabled={isLoading || !currentQuestion}
               >
-                {isListening ? 'Stop Answering' : 'Start Answering'}
+                {isCaptureMode ? 'Stop Answering' : 'Start Answering'}
               </button>
             </div>
             <div className="mt-4 min-h-24 rounded-xl border border-slate-200 bg-slate-50 p-4 text-slate-700">

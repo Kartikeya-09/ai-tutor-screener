@@ -14,26 +14,144 @@ const QUESTIONS_POOL = [
   "How do you keep a child engaged when they lose interest?"
 ];
 
+const getLastByRole = (conversationHistory, role) => {
+  for (let i = conversationHistory.length - 1; i >= 0; i -= 1) {
+    if (conversationHistory[i].role === role) {
+      return conversationHistory[i].content || '';
+    }
+  }
+  return '';
+};
+
+const normalizeText = (value = '') => value.trim().toLowerCase();
+
+const isVagueAnswer = (answer = '') => {
+  const trimmed = answer.trim();
+  if (!trimmed) return true;
+
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length <= 3) return true;
+
+  const vaguePhrases = [
+    'i dont know',
+    "i don't know",
+    'not sure',
+    'maybe',
+    'it depends',
+    'yes',
+    'no',
+    'okay',
+  ];
+
+  const normalized = normalizeText(trimmed);
+  return vaguePhrases.some((phrase) => normalized === phrase || normalized.startsWith(`${phrase} `));
+};
+
+const isLikelyTangent = (answer = '') => {
+  const normalized = normalizeText(answer);
+  if (!normalized) return false;
+
+  const offTopicSignals = [
+    'salary',
+    'package',
+    'vacation',
+    'leave policy',
+    'office location',
+    'promotion',
+  ];
+
+  const onTopicSignals = [
+    'student',
+    'child',
+    'explain',
+    'teach',
+    'lesson',
+    'fractions',
+    'patience',
+    'engage',
+  ];
+
+  const hasOffTopic = offTopicSignals.some((term) => normalized.includes(term));
+  const hasOnTopic = onTopicSignals.some((term) => normalized.includes(term));
+
+  return hasOffTopic && !hasOnTopic;
+};
+
+const buildFallbackFollowUp = (currentQuestion) => {
+  if (currentQuestion.toLowerCase().includes('fractions')) {
+    return 'Could you explain that as if the child is still confused after your first explanation?';
+  }
+
+  if (currentQuestion.toLowerCase().includes('frustrated')) {
+    return 'What exact words would you use in that first 30 seconds with the student?';
+  }
+
+  return 'Could you share a specific example so I can understand your tutoring approach better?';
+};
+
+const generateFollowUpQuestion = async (currentQuestion, lastUserAnswer) => {
+  try {
+    const prompt = `
+You are an AI interviewer for Cuemath tutor screening.
+Current interview question: "${currentQuestion}"
+Candidate answer: "${lastUserAnswer}"
+
+Write ONE short follow-up question to get clearer, concrete details.
+Rules:
+- Keep it conversational and warm.
+- Do not ask multiple questions.
+- Max 22 words.
+- Focus on tutoring behavior and communication.
+- Return only the question text.
+`;
+
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim();
+    return text.replace(/\n/g, ' ');
+  } catch {
+    return buildFallbackFollowUp(currentQuestion);
+  }
+};
+
+export const getOpeningQuestion = () => QUESTIONS_POOL[0];
+
 /**
- * Gets the next interview question.
+ * Determines the next interviewer turn based on answer quality.
  * @param {Array<Object>} conversationHistory - The conversation history so far.
- * @param {number} currentIndex - The current question index.
- * @returns {Promise<string>} The next question.
+ * @param {number} currentIndex - The current core question index.
+ * @returns {Promise<{ nextQuestion: string | null, nextIndex: number, isComplete: boolean }>} The next interviewer decision.
  */
 export const getNextQuestion = async (conversationHistory, currentIndex) => {
-  // For the first question, return from the pool directly.
-  if (currentIndex === 0) {
-    return QUESTIONS_POOL[0];
-  }
-
-  // If we've asked all questions, signal completion.
   if (currentIndex >= QUESTIONS_POOL.length) {
-    return null;
+    return { nextQuestion: null, nextIndex: currentIndex, isComplete: true };
   }
 
-  // For subsequent questions, we'll just pull from the static pool for now.
-  // A more advanced implementation could use Gemini to generate dynamic follow-up questions.
-  return QUESTIONS_POOL[currentIndex];
+  const currentQuestion = QUESTIONS_POOL[currentIndex];
+  const lastUserAnswer = getLastByRole(conversationHistory, 'user');
+  const lastAssistantQuestion = getLastByRole(conversationHistory, 'assistant');
+
+  const answeredCoreQuestionNow = normalizeText(lastAssistantQuestion) === normalizeText(currentQuestion);
+  const shouldProbe = isVagueAnswer(lastUserAnswer) || isLikelyTangent(lastUserAnswer);
+
+  if (answeredCoreQuestionNow && shouldProbe) {
+    const followUp = await generateFollowUpQuestion(currentQuestion, lastUserAnswer);
+    return {
+      nextQuestion: followUp,
+      nextIndex: currentIndex,
+      isComplete: false,
+    };
+  }
+
+  const nextIndex = currentIndex + 1;
+  if (nextIndex >= QUESTIONS_POOL.length) {
+    return { nextQuestion: null, nextIndex: currentIndex, isComplete: true };
+  }
+
+  return {
+    nextQuestion: QUESTIONS_POOL[nextIndex],
+    nextIndex,
+    isComplete: false,
+  };
 };
 
 /**

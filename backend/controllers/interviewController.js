@@ -1,6 +1,6 @@
 import Session from '../models/Session.js';
 import Report from '../models/Report.js';
-import { getNextQuestion, generateReport } from '../services/geminiService.js';
+import { getNextQuestion, getOpeningQuestion, generateReport } from '../services/geminiService.js';
 
 /**
  * Starts a new interview session.
@@ -15,8 +15,7 @@ export const startInterview = async (req, res) => {
   }
 
   try {
-    // Use the simple function for now
-        const firstQuestion = await getNextQuestion([], 0); 
+    const firstQuestion = getOpeningQuestion();
 
     const newSession = new Session({
       candidateId,
@@ -61,22 +60,17 @@ export const handleResponse = async (req, res) => {
     // Add user's response to conversation history
     session.conversation.push({ role: 'user', content: transcript });
 
-    const nextQuestionIndex = session.currentQuestionIndex + 1;
-    // Use the simple function for now
-        const nextQuestion = await getNextQuestion(session.conversation, nextQuestionIndex); 
+    const decision = await getNextQuestion(session.conversation, session.currentQuestionIndex);
 
-    let isComplete = false;
     let reportId = null;
 
-    if (nextQuestion) {
-      // Continue the interview
-      session.conversation.push({ role: 'assistant', content: nextQuestion });
-      session.currentQuestionIndex = nextQuestionIndex;
+    if (!decision.isComplete && decision.nextQuestion) {
+      session.conversation.push({ role: 'assistant', content: decision.nextQuestion });
+      session.currentQuestionIndex = decision.nextIndex;
     } else {
       // Interview is complete, generate the report
       session.status = 'completed';
       session.completedAt = new Date();
-      isComplete = true;
 
       // Bypassing report generation as requested.
       console.log('Interview complete. Skipping report generation.');
@@ -97,8 +91,8 @@ export const handleResponse = async (req, res) => {
     await session.save();
 
     res.status(200).json({
-      nextQuestion: nextQuestion,
-      isComplete: isComplete,
+      nextQuestion: decision.nextQuestion,
+      isComplete: decision.isComplete,
       reportId: reportId, // Send back the new report ID
     });
   } catch (error) {
