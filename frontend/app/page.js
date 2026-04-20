@@ -1,9 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import MicIcon from '../components/MicIcon';
 import FaqItem from '../components/FaqItem';
+import { getCandidateAuth } from '@/lib/authStorage';
 
 const faqs = [
   {
@@ -56,10 +58,20 @@ const steps = [
 
 export default function LandingPage() {
   const router = useRouter();
+  const [candidateAuth, setCandidateAuth] = useState(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [isMicReady, setIsMicReady] = useState(false);
+
+  useEffect(() => {
+    const auth = getCandidateAuth();
+    if (auth?.user) {
+      setCandidateAuth(auth);
+      setName(auth.user.name || '');
+      setEmail(auth.user.email || '');
+    }
+  }, []);
 
   const checkMicPermission = async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -80,6 +92,11 @@ export default function LandingPage() {
   const handleStartInterview = async (e) => {
     e.preventDefault();
 
+    if (!candidateAuth?.token) {
+      setError('Please login as a candidate before starting the interview.');
+      return;
+    }
+
     if (!name || !email) {
       setError('Please provide both name and email to continue.');
       return;
@@ -96,8 +113,11 @@ export default function LandingPage() {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/interview/start`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ candidateName: name, candidateEmail: email }),
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${candidateAuth.token}`,
+        },
+        body: JSON.stringify({}),
       });
 
       if (!response.ok) {
@@ -105,7 +125,10 @@ export default function LandingPage() {
       }
 
       const data = await response.json();
-      localStorage.setItem('interviewSession', JSON.stringify({ sessionId: data.sessionId, name, email }));
+      localStorage.setItem(
+        'interviewSession',
+        JSON.stringify({ sessionId: data.sessionId, name, email, firstQuestion: data.firstQuestion })
+      );
       router.push('/interview');
     } catch (err) {
       setError(err.message || 'Something went wrong while starting your session.');
@@ -170,6 +193,12 @@ export default function LandingPage() {
           <h2 className="text-3xl font-bold text-slate-900">Begin Your Interview</h2>
           <p className="mt-2 text-slate-600">Provide your details, test your mic, and launch the live screener.</p>
 
+          {!candidateAuth?.token && (
+            <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Please authenticate first: <Link href="/register" className="font-semibold underline">Register</Link> or <Link href="/login" className="font-semibold underline">Login</Link>.
+            </div>
+          )}
+
           <form onSubmit={handleStartInterview} className="mt-6 space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -180,6 +209,7 @@ export default function LandingPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="John Doe"
+                  readOnly={Boolean(candidateAuth?.token)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                 />
               </div>
@@ -192,6 +222,7 @@ export default function LandingPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@example.com"
+                  readOnly={Boolean(candidateAuth?.token)}
                   className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                 />
               </div>
@@ -213,7 +244,7 @@ export default function LandingPage() {
 
               <button
                 type="submit"
-                disabled={!name || !email}
+                disabled={!name || !email || !candidateAuth?.token}
                 className="inline-flex items-center rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 Start Interview

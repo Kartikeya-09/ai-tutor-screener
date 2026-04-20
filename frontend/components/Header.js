@@ -1,6 +1,39 @@
+"use client";
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { clearCandidateAuth, getCandidateAuth, startCandidateAutoLogout } from '@/lib/authStorage';
 
 export default function Header() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const [candidateLoggedIn, setCandidateLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const auth = getCandidateAuth();
+    setCandidateLoggedIn(Boolean(auth?.token));
+
+    const timeoutId = startCandidateAutoLogout(() => {
+      setCandidateLoggedIn(false);
+      if (!pathname?.startsWith('/admin')) {
+        router.push('/login');
+      }
+    });
+
+    return () => {
+      if (timeoutId) {
+        window.clearTimeout(timeoutId);
+      }
+    };
+  }, [pathname, router]);
+
+  const handleCandidateLogout = () => {
+    clearCandidateAuth();
+    setCandidateLoggedIn(false);
+    router.push('/login');
+  };
+
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-200/70 bg-white/85 backdrop-blur">
       <nav className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
@@ -15,8 +48,23 @@ export default function Header() {
           <Link href="/" className="px-3 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900">
             Candidate Portal
           </Link>
-          <Link href="/admin" className="rounded-full bg-sky-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-800">
-            Recruiter Dashboard
+
+          {candidateLoggedIn ? (
+            <button
+              type="button"
+              onClick={handleCandidateLogout}
+              className="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900"
+            >
+              Candidate Logout
+            </button>
+          ) : (
+            <Link href="/login" className="px-3 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900">
+              Candidate Login
+            </Link>
+          )}
+
+          <Link href="/admin/login" className="rounded-full bg-sky-900 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-sky-800">
+            Admin Login
           </Link>
         </div>
       </nav>

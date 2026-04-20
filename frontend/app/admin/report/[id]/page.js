@@ -1,16 +1,24 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { getAdminAuth } from '@/lib/authStorage';
 
 export default function ReportPage() {
+  const router = useRouter();
   const [report, setReport] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const { id } = useParams();
 
   useEffect(() => {
+    const auth = getAdminAuth();
+    if (!auth?.token) {
+      router.push('/admin/login');
+      return;
+    }
+
     if (!id) return;
 
     const fetchReport = async () => {
@@ -25,7 +33,7 @@ export default function ReportPage() {
     };
 
     fetchReport();
-  }, [id]);
+  }, [id, router]);
 
   if (isLoading) {
     return <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8 text-slate-600">Loading report...</div>;

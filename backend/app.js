@@ -8,6 +8,8 @@ dotenv.config();
 
 import interviewRoutes from './routes/interviewRoutes.js';
 import assessmentRoutes from './routes/assessmentRoutes.js';
+import authRoutes from './routes/authRoutes.js';
+import { ensureAdminUser } from './services/authService.js';
 
 
 const app = express();
@@ -20,6 +22,7 @@ app.use(cors({
 app.use(express.json());
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/interview', interviewRoutes);
 app.use('/api/assessment', assessmentRoutes);
 
@@ -47,7 +50,13 @@ app.get('/', (req, res) => {
 
 // Connect to MongoDB and start server
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => {
+  .then(async () => {
+    if (!process.env.JWT_SECRET) {
+      throw new Error('JWT_SECRET is missing from environment variables.');
+    }
+
+    await ensureAdminUser();
+
     console.log('Connected to MongoDB');
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);

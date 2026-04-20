@@ -2,14 +2,23 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
+import { getAdminAuth } from '@/lib/authStorage';
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [sessions, setSessions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    const auth = getAdminAuth();
+    if (!auth?.token) {
+      router.push('/admin/login');
+      return;
+    }
+
     const fetchSessions = async () => {
       try {
         const response = await api.get('/assessment/sessions');
@@ -22,7 +31,7 @@ export default function AdminDashboard() {
     };
 
     fetchSessions();
-  }, []);
+  }, [router]);
 
   const completedCount = sessions.filter((session) => session.status === 'completed').length;
   const inProgressCount = sessions.filter((session) => session.status === 'in-progress').length;

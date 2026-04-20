@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { getCandidateAuth } from '@/lib/authStorage';
 
 const useSpeechRecognition = ({ onResult, onEnd }) => {
   const recognition = useRef(null);
@@ -59,6 +60,7 @@ const useSpeechRecognition = ({ onResult, onEnd }) => {
 
 export default function InterviewPage() {
   const router = useRouter();
+  const [candidateToken, setCandidateToken] = useState('');
   const [session, setSession] = useState(null);
   const [currentQuestion, setCurrentQuestion] = useState('');
   const [transcript, setTranscript] = useState('');
@@ -94,6 +96,14 @@ export default function InterviewPage() {
   });
 
   useEffect(() => {
+    const auth = getCandidateAuth();
+    if (!auth?.token) {
+      router.push('/login');
+      return;
+    }
+
+    setCandidateToken(auth.token);
+
     const storedSession = JSON.parse(localStorage.getItem('interviewSession'));
     if (!storedSession || !storedSession.sessionId) {
       router.push('/');
@@ -102,33 +112,17 @@ export default function InterviewPage() {
 
     setSession(storedSession);
 
-    const fetchFirstQuestion = async () => {
-      setIsLoading(true);
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/interview/start`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ candidateName: storedSession.name, candidateEmail: storedSession.email }),
-        });
-
-        if (!response.ok) throw new Error('Could not fetch the first question.');
-
-        const data = await response.json();
-        setCurrentQuestion(data.firstQuestion);
-        setQuestionIndex(1);
-        speak(data.firstQuestion);
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchFirstQuestion();
+    if (storedSession.firstQuestion) {
+      setCurrentQuestion(storedSession.firstQuestion);
+      setQuestionIndex(1);
+      speak(storedSession.firstQuestion);
+    } else {
+      setError('Unable to load first question. Please restart your interview.');
+    }
   }, [router]);
 
   const sendResponse = async (userTranscript) => {
-    if (!session?.sessionId) return;
+    if (!session?.sessionId || !candidateToken) return;
 
     setIsLoading(true);
     setError('');
@@ -136,7 +130,10 @@ export default function InterviewPage() {
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/interview/respond`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${candidateToken}`,
+        },
         body: JSON.stringify({ sessionId: session.sessionId, transcript: userTranscript }),
       });
 
@@ -150,7 +147,10 @@ export default function InterviewPage() {
       if (data.isComplete) {
         await fetch(`${process.env.NEXT_PUBLIC_API_URL}/interview/complete`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${candidateToken}`,
+          },
           body: JSON.stringify({ sessionId: session.sessionId }),
         });
         router.push('/thank-you');
