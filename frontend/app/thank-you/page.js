@@ -20,20 +20,17 @@ export default function ThankYouPage() {
         <div className="mt-8 grid gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-5 text-left sm:grid-cols-2">
           <div>
             <p className="text-sm font-semibold text-slate-800">What happens next?</p>
-            <p className="mt-1 text-sm text-slate-600">Your communication performance is analyzed and summarized in a structured recruiter report.</p>
+            <p className="mt-1 text-sm text-slate-600">Your communication performance is analyzed and summarized in a structured recruiter report within 24 to 48 hours.</p>
           </div>
           <div>
-            <p className="text-sm font-semibold text-slate-800">Need to return?</p>
-            <p className="mt-1 text-sm text-slate-600">You can go back to the candidate portal at any time using the button below.</p>
+            <p className="text-sm font-semibold text-slate-800">How we review fairly</p>
+            <p className="mt-1 text-sm text-slate-600">Evaluation focuses on clarity, warmth, simplicity, patience, and fluency from your responses, not accent.</p>
           </div>
         </div>
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
           <Link href="/" className="rounded-full bg-sky-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-800">
             Back to Candidate Home
-          </Link>
-          <Link href="/admin" className="rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900">
-            Open Recruiter Dashboard
           </Link>
         </div>
       </main>

@@ -101,6 +101,7 @@ export default function InterviewPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [questionIndex, setQuestionIndex] = useState(0);
+  const [interviewMode, setInterviewMode] = useState('Exploring');
 
   const TOTAL_QUESTIONS = 6;
   const THINKING_GAP_MS = 1800;
@@ -192,7 +193,7 @@ export default function InterviewPage() {
       setTranscript('');
 
       if (data.isComplete) {
-        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/interview/complete`, {
+        const completionResponse = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/interview/complete`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -200,11 +201,17 @@ export default function InterviewPage() {
           },
           body: JSON.stringify({ sessionId: session.sessionId }),
         });
+
+        if (!completionResponse.ok) {
+          throw new Error('Interview finished, but report generation failed. Please retry in a moment.');
+        }
+
         router.push('/thank-you');
         return;
       }
 
       setCurrentQuestion(data.nextQuestion);
+      setInterviewMode(data.interviewMode || 'Exploring');
       setQuestionIndex((prev) => prev + 1);
       speak(data.nextQuestion);
     } catch (err) {
@@ -228,7 +235,12 @@ export default function InterviewPage() {
         </div>
 
         <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-6">
-          <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Current Prompt</p>
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">Current Prompt</p>
+            <span className="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-900">
+              Interview Mode: {interviewMode}
+            </span>
+          </div>
           <p className="mt-3 text-xl leading-8 text-slate-800">{currentQuestion || 'Loading first question...'}</p>
         </div>
 

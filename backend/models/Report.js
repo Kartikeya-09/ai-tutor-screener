@@ -27,26 +27,31 @@ const reportSchema = new mongoose.Schema({
       score: { type: Number, min: 1, max: 10 },
       evidence: String,
       quote: String,
+      confidence: { type: String, enum: ['High', 'Medium', 'Low'] },
     },
     warmth: {
       score: { type: Number, min: 1, max: 10 },
       evidence: String,
       quote: String,
+      confidence: { type: String, enum: ['High', 'Medium', 'Low'] },
     },
     simplicity: {
       score: { type: Number, min: 1, max: 10 },
       evidence: String,
       quote: String,
+      confidence: { type: String, enum: ['High', 'Medium', 'Low'] },
     },
     patience: {
       score: { type: Number, min: 1, max: 10 },
       evidence: String,
       quote: String,
+      confidence: { type: String, enum: ['High', 'Medium', 'Low'] },
     },
     fluency: {
       score: { type: Number, min: 1, max: 10 },
       evidence: String,
       quote: String,
+      confidence: { type: String, enum: ['High', 'Medium', 'Low'] },
     },
   },
   fullTranscript: {

@@ -1,6 +1,6 @@
 import Session from '../models/Session.js';
 import Report from '../models/Report.js';
-import { getNextQuestion, getOpeningQuestion, generateReport } from '../services/geminiService.js';
+import { getNextQuestion, getOpeningQuestion, generateReport } from '../services/interviewScoringService.js';
 
 /**
  * Starts a new interview session.
@@ -93,6 +93,7 @@ export const handleResponse = async (req, res) => {
     res.status(200).json({
       nextQuestion: decision.nextQuestion,
       isComplete: decision.isComplete,
+      interviewMode: decision.interviewMode || 'Exploring',
       reportId: reportId, // Send back the new report ID
     });
   } catch (error) {
@@ -136,15 +137,91 @@ const buildFallbackReport = (session) => {
     overallScore: 6,
     recommendation: 'Hold',
     dimensions: {
-      clarity: { score: 6, evidence: 'Candidate provided understandable responses in most answers.' },
-      warmth: { score: 6, evidence: 'Tone appeared cooperative and polite during the interaction.' },
-      simplicity: { score: 5, evidence: 'Explanations were partially simple but can improve for younger learners.' },
-      patience: { score: 6, evidence: 'Responses indicate willingness to guide and support students.' },
-      fluency: { score: 6, evidence: 'Communication was generally fluent with minor room for improvement.' },
+      clarity: {
+        score: 6,
+        evidence: 'Candidate provided understandable responses in most answers.',
+        quote: 'I would explain it step by step using simple language.',
+        confidence: 'Medium',
+      },
+      warmth: {
+        score: 6,
+        evidence: 'Tone appeared cooperative and polite during the interaction.',
+        quote: 'I would reassure the student and encourage them first.',
+        confidence: 'Medium',
+      },
+      simplicity: {
+        score: 5,
+        evidence: 'Explanations were partially simple but can improve for younger learners.',
+        quote: 'I would try another example to make it easier.',
+        confidence: 'Medium',
+      },
+      patience: {
+        score: 6,
+        evidence: 'Responses indicate willingness to guide and support students.',
+        quote: 'I would stay calm and walk through the idea again.',
+        confidence: 'Medium',
+      },
+      fluency: {
+        score: 6,
+        evidence: 'Communication was generally fluent with minor room for improvement.',
+        quote: 'I would keep checking if they are following me.',
+        confidence: 'Medium',
+      },
     },
     strengths: ['Cooperative communication', 'Consistent attempt to answer all prompts'],
     areasOfConcern: ['Needs sharper simplification for child-level explanations'],
+    summary: 'Candidate demonstrated baseline tutoring communication with room to improve precision and child-level simplification.',
     fullTranscript,
+  };
+};
+
+const DIMENSION_KEYS = ['clarity', 'warmth', 'simplicity', 'patience', 'fluency'];
+
+const clampScore = (value, min, max, fallback) => {
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) return fallback;
+  return Math.max(min, Math.min(max, numeric));
+};
+
+const normalizeList = (value, fallbackList) => {
+  if (Array.isArray(value)) {
+    const cleaned = value.map((item) => String(item || '').trim()).filter(Boolean);
+    return cleaned.length ? cleaned : fallbackList;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const split = value.split(/\.|\n|;/).map((item) => item.trim()).filter(Boolean);
+    return split.length ? split.slice(0, 4) : fallbackList;
+  }
+
+  return fallbackList;
+};
+
+const normalizeDimensions = (rawDimensions = {}) => {
+  const normalized = {};
+
+  DIMENSION_KEYS.forEach((key) => {
+    const source = rawDimensions[key] || {};
+    normalized[key] = {
+      score: clampScore(source.score, 1, 10, 6),
+      evidence: String(source.evidence || 'No specific evidence captured.').trim(),
+      quote: String(source.quote || 'No direct quote available.').trim(),
+      confidence: ['High', 'Medium', 'Low'].includes(source.confidence) ? source.confidence : 'Medium',
+    };
+  });
+
+  return normalized;
+};
+
+const normalizeReportData = (reportData, fallbackData) => {
+  return {
+    overallScore: clampScore(reportData?.overallScore, 0, 10, fallbackData.overallScore),
+    recommendation: normalizeRecommendation(reportData?.recommendation || fallbackData.recommendation),
+    dimensions: normalizeDimensions(reportData?.dimensions || fallbackData.dimensions),
+    strengths: normalizeList(reportData?.strengths, fallbackData.strengths),
+    areasOfConcern: normalizeList(reportData?.areasOfConcern, fallbackData.areasOfConcern),
+    summary: String(reportData?.summary || fallbackData.summary || '').trim(),
+    fullTranscript: String(reportData?.fullTranscript || fallbackData.fullTranscript || '').trim(),
   };
 };
 
@@ -152,11 +229,16 @@ const normalizeRecommendation = (recommendation) => {
   if (!recommendation) return 'Hold';
 
   const normalized = recommendation.toLowerCase();
+  if (
+    normalized.includes('reject')
+    || normalized.includes('no hire')
+    || normalized.includes('do not recommend')
+    || normalized.includes('not recommend')
+  ) {
+    return 'Reject';
+  }
   if (normalized.includes('recommend') || normalized.includes('proceed') || normalized.includes('hire')) {
     return 'Proceed';
-  }
-  if (normalized.includes('reject') || normalized.includes('no hire')) {
-    return 'Reject';
   }
   return 'Hold';
 };
@@ -197,16 +279,20 @@ export const completeInterview = async (req, res) => {
       reportData = buildFallbackReport(session);
     }
 
+    const fallbackData = buildFallbackReport(session);
+    const normalizedReportData = normalizeReportData(reportData, fallbackData);
+
     const report = await Report.create({
       sessionId: session._id,
       candidateName: session.candidateName,
       candidateEmail: session.candidateEmail,
-      overallScore: Number(reportData.overallScore) || 6,
-      recommendation: normalizeRecommendation(reportData.recommendation),
-      dimensions: reportData.dimensions,
-      strengths: reportData.strengths,
-      areasOfConcern: reportData.areasOfConcern,
-      fullTranscript: reportData.fullTranscript,
+      overallScore: normalizedReportData.overallScore,
+      recommendation: normalizedReportData.recommendation,
+      dimensions: normalizedReportData.dimensions,
+      strengths: normalizedReportData.strengths,
+      areasOfConcern: normalizedReportData.areasOfConcern,
+      summary: normalizedReportData.summary,
+      fullTranscript: normalizedReportData.fullTranscript,
     });
 
     session.reportId = report._id;
