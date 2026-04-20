@@ -71,19 +71,20 @@ export const handleResponse = async (req, res) => {
       session.completedAt = new Date();
       isComplete = true;
 
-      console.log('Interview complete. Generating assessment report...');
-      const reportData = await generateReport(session.conversation);
+      // Bypassing report generation as requested.
+      console.log('Interview complete. Skipping report generation.');
+      // const reportData = await generateReport(session.conversation);
 
-      const newReport = new Report({
-        sessionId: session._id,
-        candidateName: session.candidateName,
-        ...reportData,
-      });
+      // const newReport = new Report({
+      //   sessionId: session._id,
+      //   candidateName: session.candidateName,
+      //   ...reportData,
+      // });
 
-      await newReport.save();
-      reportId = newReport._id;
-      session.reportId = reportId;
-      console.log(`Report ${reportId} generated and saved for session ${session._id}`);
+      // await newReport.save();
+      // reportId = newReport._id;
+      // session.reportId = reportId;
+      // console.log(`Report ${reportId} generated and saved for session ${session._id}`);
     }
 
     await session.save();
