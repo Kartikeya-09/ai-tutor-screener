@@ -13,7 +13,7 @@ export default function AdminDashboard() {
     const fetchSessions = async () => {
       try {
         const response = await api.get('/assessment/sessions');
-        setSessions(response.data);
+        setSessions(response.data || []);
       } catch (err) {
         setError(err.response?.data?.message || err.message || 'Failed to fetch sessions.');
       } finally {
@@ -24,64 +24,106 @@ export default function AdminDashboard() {
     fetchSessions();
   }, []);
 
-  return (
-    <div className="flex flex-col flex-1 bg-zinc-50 font-sans p-4 sm:p-8">
-      <main className="flex-1 w-full max-w-6xl mx-auto bg-white shadow-lg rounded-lg p-8">
-        <h1 className="text-3xl font-bold mb-8">Admin Dashboard</h1>
-        
-        {isLoading && <p>Loading sessions...</p>}
-        {error && <p className="text-red-500">{error}</p>}
+  const completedCount = sessions.filter((session) => session.status === 'completed').length;
+  const inProgressCount = sessions.filter((session) => session.status === 'in-progress').length;
 
-        {!isLoading && !error && (
-          <div className="overflow-x-auto">
-            <table className="min-w-full bg-white border">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="py-3 px-4 border-b text-left">Candidate</th>
-                  <th className="py-3 px-4 border-b text-left">Status</th>
-                  <th className="py-3 px-4 border-b text-left">Started At</th>
-                  <th className="py-3 px-4 border-b text-left">Completed At</th>
-                  <th className="py-3 px-4 border-b text-left">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {sessions.length > 0 ? sessions.map((session) => (
-                  <tr key={session._id} className="hover:bg-gray-50">
-                    <td className="py-3 px-4 border-b">
-                        <div>{session.candidateName}</div>
-                        <div className="text-sm text-gray-500">{session.candidateEmail}</div>
-                    </td>
-                    <td className="py-3 px-4 border-b">
-                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                        session.status === 'completed' ? 'bg-green-100 text-green-800' :
-                        session.status === 'in-progress' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {session.status}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 border-b">{new Date(session.startedAt).toLocaleString()}</td>
-                    <td className="py-3 px-4 border-b">{session.completedAt ? new Date(session.completedAt).toLocaleString() : 'N/A'}</td>
-                    <td className="py-3 px-4 border-b">
-                      {session.reportId ? (
-                        <Link href={`/admin/report/${session.reportId}`} className="text-blue-600 hover:underline">
-                            View Report
-                        </Link>
-                      ) : (
-                        <span className="text-gray-400">No report</span>
-                      )}
-                    </td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan="5" className="text-center py-8 text-gray-500">No sessions found.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+  return (
+    <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
+      <section className="rounded-3xl border border-slate-200 bg-white/95 p-6 shadow-xl sm:p-8">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Recruiter Workspace</p>
+            <h1 className="mt-1 text-4xl font-bold text-slate-900">Interview Sessions</h1>
+            <p className="mt-2 text-slate-600">Track candidate progress and open individual screening reports.</p>
           </div>
-        )}
-      </main>
+
+          <Link href="/" className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900">
+            Candidate Landing
+          </Link>
+        </div>
+
+        <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-sm text-slate-500">Total Sessions</p>
+            <p className="mt-2 text-3xl font-bold text-slate-900">{sessions.length}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-emerald-50 p-4">
+            <p className="text-sm text-emerald-700">Completed</p>
+            <p className="mt-2 text-3xl font-bold text-emerald-800">{completedCount}</p>
+          </div>
+          <div className="rounded-2xl border border-slate-200 bg-amber-50 p-4">
+            <p className="text-sm text-amber-700">In Progress</p>
+            <p className="mt-2 text-3xl font-bold text-amber-800">{inProgressCount}</p>
+          </div>
+        </div>
+
+        <div className="mt-8 overflow-hidden rounded-2xl border border-slate-200">
+          {isLoading && <p className="p-6 text-slate-600">Loading sessions...</p>}
+          {error && <p className="p-6 text-rose-600">{error}</p>}
+
+          {!isLoading && !error && (
+            <div className="overflow-x-auto">
+              <table className="min-w-full bg-white">
+                <thead className="bg-slate-50 text-sm text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold">Candidate</th>
+                    <th className="px-4 py-3 text-left font-semibold">Status</th>
+                    <th className="px-4 py-3 text-left font-semibold">Started At</th>
+                    <th className="px-4 py-3 text-left font-semibold">Completed At</th>
+                    <th className="px-4 py-3 text-left font-semibold">Action</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {sessions.length > 0 ? (
+                    sessions.map((session) => (
+                      <tr key={session._id} className="border-t border-slate-100 text-sm text-slate-700">
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-slate-900">{session.candidateName}</p>
+                          <p className="text-xs text-slate-500">{session.candidateEmail}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              session.status === 'completed'
+                                ? 'bg-emerald-100 text-emerald-800'
+                                : session.status === 'in-progress'
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}
+                          >
+                            {session.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">{new Date(session.startedAt).toLocaleString()}</td>
+                        <td className="px-4 py-3">{session.completedAt ? new Date(session.completedAt).toLocaleString() : 'N/A'}</td>
+                        <td className="px-4 py-3">
+                          {session.reportId ? (
+                            <Link
+                              href={`/admin/report/${session.reportId}`}
+                              className="rounded-full bg-sky-900 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-800"
+                            >
+                              View Report
+                            </Link>
+                          ) : (
+                            <span className="text-xs text-slate-400">No report yet</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="5" className="px-4 py-8 text-center text-slate-500">
+                        No sessions found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   );
 }

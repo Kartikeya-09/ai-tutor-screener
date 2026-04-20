@@ -2,213 +2,264 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import api from '@/lib/api';
+import MicIcon from '../components/MicIcon';
+import FaqItem from '../components/FaqItem';
+
+const faqs = [
+  {
+    question: 'How long is the interview process?',
+    answer: 'The screener includes 6 guided questions and usually takes 8 to 12 minutes to complete.',
+  },
+  {
+    question: 'What exactly is being evaluated?',
+    answer: 'We evaluate communication quality for tutoring: clarity, empathy, structure, confidence, and learner-friendly explanations.',
+  },
+  {
+    question: 'Do I need any software download?',
+    answer: 'No downloads. Use a modern browser (Chrome or Edge) with microphone permission enabled.',
+  },
+  {
+    question: 'Can I pause and continue later?',
+    answer: 'This is a continuous screening flow. Please begin only when you are ready in a quiet environment.',
+  },
+  {
+    question: 'Will my responses be reviewed by humans?',
+    answer: 'Yes. AI provides first-pass scoring, and final hiring decisions are made by the recruiting team.',
+  },
+];
+
+const requirements = [
+  'Quiet room with minimal interruptions',
+  'Laptop or desktop with stable internet',
+  'Working microphone and browser permissions',
+  '8 to 12 minutes of uninterrupted time',
+];
+
+const steps = [
+  {
+    title: 'Profile Setup',
+    description: 'Enter your name and email so your responses are tied to your evaluation profile.',
+  },
+  {
+    title: 'Audio Readiness',
+    description: 'Run a quick microphone check before entering the interview room.',
+  },
+  {
+    title: 'Voice Interview',
+    description: 'Answer six spoken prompts naturally while your transcript is captured in real time.',
+  },
+  {
+    title: 'Assessment Review',
+    description: 'Recruiters receive a structured report with strengths, concerns, and recommendation.',
+  },
+];
 
 export default function LandingPage() {
-  const [candidateName, setCandidateName] = useState('');
-  const [candidateEmail, setCandidateEmail] = useState('');
-  const [error, setError] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
-
-  const handleStartInterview = async (e) => {
-    e.preventDefault();
-    setError(null);
-    setIsLoading(true);
-
-    try {
-      const response = await api.post('/interview/start', {
-        candidateName,
-        candidateEmail,
-      });
-      router.push(`/interview/${response.data.sessionId}`);
-    } catch (err) {
-      setError(err.response?.data?.message || err.message || 'Failed to start interview.');
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans p-4 sm:p-8">
-      "use client";
-
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-
-// You can replace these with actual icons from a library like react-icons
-const MicIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-  </svg>
-);
-
-const FaqItem = ({ question, answer }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  return (
-    <div className="border-b border-gray-200 py-4">
-      <button
-        className="w-full flex justify-between items-center text-left text-lg font-medium text-gray-800"
-        onClick={() => setIsOpen(!isOpen)}
-      >
-        <span>{question}</span>
-        <span className={`transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-          </svg>
-        </span>
-      </button>
-      {isOpen && <p className="mt-2 text-gray-600">{answer}</p>}
-    </div>
-  );
-};
-
-export default function LandingPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [isMicReady, setIsMicReady] = useState(false);
-  const router = useRouter();
 
   const checkMicPermission = async () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      setError("Your browser doesn't support microphone access.");
+      setError("Your browser does not support microphone access.");
       return;
     }
+
     try {
       await navigator.mediaDevices.getUserMedia({ audio: true });
       setIsMicReady(true);
       setError('');
-    } catch (err) {
-      setError('Microphone access is required for the interview. Please allow access and try again.');
+    } catch {
       setIsMicReady(false);
+      setError('Microphone access is required. Please allow microphone permission and try again.');
     }
   };
 
   const handleStartInterview = async (e) => {
     e.preventDefault();
+
     if (!name || !email) {
-      setError('Please enter your name and email.');
+      setError('Please provide both name and email to continue.');
       return;
     }
+
     if (!isMicReady) {
-        await checkMicPermission();
-        // If permission is granted, the user needs to click again.
-        // This is a browser security feature.
-        if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-            setError('Microphone is ready. Click "Start Interview" again to begin.');
-        }
-        return;
+      await checkMicPermission();
+      if (navigator.mediaDevices?.getUserMedia) {
+        setError('Microphone is ready. Click Start Interview once more to begin.');
+      }
+      return;
     }
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/interview/start`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/interview/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ candidateName: name, candidateEmail: email }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to start the interview session.');
+        throw new Error('Unable to start interview session. Please try again.');
       }
 
       const data = await response.json();
-      // Store session details and navigate to the interview page
       localStorage.setItem('interviewSession', JSON.stringify({ sessionId: data.sessionId, name, email }));
       router.push('/interview');
-
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Something went wrong while starting your session.');
     }
   };
 
-  const faqs = [
-    { question: "How long is the interview?", answer: "The interview consists of 6 questions and typically takes about 10 minutes to complete." },
-    { question: "What is the interview about?", answer: "This is a screening interview to assess your communication skills, such as clarity, warmth, and patience. We are not testing your math knowledge." },
-    { question: "Do I need any special equipment?", answer: "You will need a working microphone and a modern web browser like Chrome or Edge on a desktop or laptop computer." },
-    { question: "Can I retake the interview?", answer: "This is a one-time screening. Please make sure you are in a quiet environment before you begin." },
-  ];
-
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-2xl">
-        <header className="text-center mb-10">
-          <h1 className="text-4xl font-bold text-gray-800">Cuemath Tutor Screening</h1>
-          <p className="text-lg text-gray-600 mt-2">Welcome! Let's get you started with your automated interview.</p>
-        </header>
+    <div className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+      <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg sm:p-10">
+        <div className="absolute -right-14 -top-14 h-48 w-48 rounded-full bg-orange-200/45 blur-3xl" />
+        <div className="absolute -bottom-20 left-10 h-52 w-52 rounded-full bg-emerald-200/45 blur-3xl" />
 
-        <main className="bg-white p-8 rounded-lg shadow-md">
-          <form onSubmit={handleStartInterview}>
-            <div className="space-y-6">
+        <div className="relative grid gap-10 lg:grid-cols-2 lg:items-center">
+          <div>
+            <p className="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-800">
+              AI Tutor Screening Platform
+            </p>
+            <h1 className="mt-4 text-4xl font-bold leading-tight text-slate-900 sm:text-5xl">
+              Hire Better Tutors with a
+              <span className="block text-sky-900">Voice-First Screening Flow</span>
+            </h1>
+            <p className="mt-5 max-w-xl text-base leading-7 text-slate-600">
+              This interview experience evaluates communication style and tutoring readiness at scale.
+              Complete a short guided conversation and let recruiters review your structured assessment.
+            </p>
+
+            <div className="mt-7 flex flex-wrap gap-3">
+              <a href="#start" className="rounded-full bg-sky-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-sky-800">
+                Start Candidate Journey
+              </a>
+              <a href="#faq" className="rounded-full border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:text-slate-900">
+                View FAQs
+              </a>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 sm:p-6">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="rounded-xl bg-white p-4 shadow-sm">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Interview Length</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900">~10 min</p>
+              </div>
+              <div className="rounded-xl bg-white p-4 shadow-sm">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Question Count</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900">6 prompts</p>
+              </div>
+              <div className="rounded-xl bg-white p-4 shadow-sm">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Input Mode</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900">Voice</p>
+              </div>
+              <div className="rounded-xl bg-white p-4 shadow-sm">
+                <p className="text-xs uppercase tracking-wide text-slate-500">Evaluation</p>
+                <p className="mt-2 text-2xl font-bold text-slate-900">AI + Human</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="start" className="mt-10 grid gap-8 lg:grid-cols-3">
+        <div className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-md lg:col-span-2 sm:p-8">
+          <h2 className="text-3xl font-bold text-slate-900">Begin Your Interview</h2>
+          <p className="mt-2 text-slate-600">Provide your details, test your mic, and launch the live screener.</p>
+
+          <form onSubmit={handleStartInterview} className="mt-6 space-y-5">
+            <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700">Full Name</label>
+                <label htmlFor="name" className="mb-2 block text-sm font-medium text-slate-700">Full Name</label>
                 <input
-                  type="text"
                   id="name"
+                  type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="John Doe"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                 />
               </div>
+
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email Address</label>
+                <label htmlFor="email" className="mb-2 block text-sm font-medium text-slate-700">Email Address</label>
                 <input
-                  type="email"
                   id="email"
+                  type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 block w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder="you@example.com"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
                 />
               </div>
             </div>
 
-            <div className="mt-8">
+            <div className="flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={checkMicPermission}
-                className={`w-full flex items-center justify-center px-6 py-3 border rounded-md text-lg font-medium transition-colors duration-200 ${
+                className={`inline-flex items-center rounded-full px-5 py-3 text-sm font-semibold transition ${
                   isMicReady
-                    ? 'bg-green-100 border-green-400 text-green-800'
-                    : 'bg-blue-100 border-blue-400 text-blue-800 hover:bg-blue-200'
+                    ? 'bg-emerald-100 text-emerald-800'
+                    : 'bg-sky-100 text-sky-800 hover:bg-sky-200'
                 }`}
               >
                 <MicIcon />
-                <span className="ml-3">{isMicReady ? 'Microphone Ready!' : 'Test Your Microphone'}</span>
+                <span className="ml-2">{isMicReady ? 'Microphone Ready' : 'Test Microphone'}</span>
               </button>
-            </div>
 
-            {error && <p className="mt-4 text-sm text-center text-red-600">{error}</p>}
-
-            <div className="mt-8">
               <button
                 type="submit"
-                className="w-full flex items-center justify-center px-6 py-4 border border-transparent rounded-md shadow-sm text-lg font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:bg-gray-400"
                 disabled={!name || !email}
+                className="inline-flex items-center rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-slate-300"
               >
                 Start Interview
               </button>
             </div>
+
+            {error && (
+              <p className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p>
+            )}
           </form>
-        </main>
+        </div>
 
-        <section className="mt-12">
-            <h2 className="text-2xl font-semibold text-center text-gray-800 mb-6">Frequently Asked Questions</h2>
-            <div className="bg-white p-8 rounded-lg shadow-md">
-                {faqs.map((faq, index) => (
-                    <FaqItem key={index} question={faq.question} answer={faq.answer} />
-                ))}
-            </div>
-        </section>
+        <div className="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-md sm:p-8">
+          <h3 className="text-xl font-semibold text-slate-900">Before You Start</h3>
+          <ul className="mt-4 space-y-3 text-sm text-slate-600">
+            {requirements.map((item) => (
+              <li key={item} className="flex gap-3">
+                <span className="mt-1 inline-block h-2.5 w-2.5 rounded-full bg-orange-500" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
 
-        <footer className="text-center text-gray-500 mt-12 py-4">
-            <p>&copy; {new Date().getFullYear()} Cuemath. All rights reserved.</p>
-        </footer>
-      </div>
-    </div>
-  );
-}
+      <section className="mt-10 rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-md sm:p-8">
+        <h2 className="text-3xl font-bold text-slate-900">How It Works</h2>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {steps.map((step, idx) => (
+            <article key={step.title} className="rounded-2xl border border-slate-200 bg-white p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Step {idx + 1}</p>
+              <h3 className="mt-2 text-xl font-semibold text-slate-900">{step.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{step.description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
 
+      <section id="faq" className="mt-10 rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-md sm:p-8">
+        <h2 className="text-3xl font-bold text-slate-900">Frequently Asked Questions</h2>
+        <div className="mt-5 space-y-3">
+          {faqs.map((faq) => (
+            <FaqItem key={faq.question} question={faq.question} answer={faq.answer} />
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
