@@ -94,6 +94,7 @@ export const handleResponse = async (req, res) => {
       nextQuestion: decision.nextQuestion,
       isComplete: decision.isComplete,
       interviewMode: decision.interviewMode || 'Exploring',
+      coreQuestionNumber: Math.min(Number(session.currentQuestionIndex || 0) + 1, 6),
       reportId: reportId, // Send back the new report ID
     });
   } catch (error) {

@@ -321,7 +321,7 @@ export default function InterviewPage() {
 
       setCurrentQuestion(data.nextQuestion);
       setInterviewMode(data.interviewMode || 'Exploring');
-      setQuestionIndex((prev) => prev + 1);
+      setQuestionIndex(Math.min(Number(data.coreQuestionNumber || 1), TOTAL_QUESTIONS));
       speak(data.nextQuestion);
     } catch (err) {
       setError(err.message);
