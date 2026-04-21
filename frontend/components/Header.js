@@ -49,6 +49,10 @@ export default function Header() {
             Candidate Portal
           </Link>
 
+          <Link href="/contact" className="px-3 py-2 text-sm font-medium text-slate-600 transition hover:text-slate-900">
+            Contact Us
+          </Link>
+
           {candidateLoggedIn ? (
             <button
               type="button"

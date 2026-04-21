@@ -4,29 +4,52 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { getCandidateAuth } from '@/lib/authStorage';
 
-const useSpeechRecognition = ({ onResult, onEnd }) => {
+const useSpeechRecognition = ({ onResult, onEnd, onError }) => {
   const recognition = useRef(null);
   const shouldCapture = useRef(false);
   const stopRequested = useRef(false);
+  const latestTranscript = useRef('');
   const [isListening, setIsListening] = useState(false);
   const [isCaptureMode, setIsCaptureMode] = useState(false);
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
+      if (onError) {
+        onError('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
+      }
       return;
     }
 
     recognition.current = new SpeechRecognition();
     const rec = recognition.current;
-    rec.continuous = true;
+    rec.continuous = false;
     rec.interimResults = true;
-    rec.lang = 'en-US';
+    rec.lang = (typeof navigator !== 'undefined' && navigator.language) ? navigator.language : 'en-US';
+
+    rec.onstart = () => {
+      setIsListening(true);
+    };
 
     rec.onresult = (event) => {
-      const nextTranscript = Array.from(event.results)
-        .map((result) => result[0].transcript)
-        .join('');
+      let finalText = '';
+      let interimText = '';
+
+      for (let i = event.resultIndex; i < event.results.length; i += 1) {
+        const result = event.results[i];
+        const piece = result?.[0]?.transcript || '';
+        if (!piece) continue;
+
+        if (result.isFinal) {
+          finalText = `${finalText} ${piece}`.trim();
+        } else {
+          interimText = `${interimText} ${piece}`.trim();
+        }
+      }
+
+      const nextTranscript = `${finalText} ${interimText}`.trim();
+
+      latestTranscript.current = nextTranscript;
       onResult(nextTranscript);
     };
 
@@ -36,43 +59,82 @@ const useSpeechRecognition = ({ onResult, onEnd }) => {
       if (stopRequested.current) {
         stopRequested.current = false;
         setIsCaptureMode(false);
-        if (onEnd) onEnd();
+        if (onEnd) onEnd(latestTranscript.current);
+        latestTranscript.current = '';
         return;
       }
 
-      // Browser speech recognition can stop on short silence; auto-restart while user is in answer mode.
+      // End of one speech turn. Submit captured transcript.
       if (shouldCapture.current) {
-        window.setTimeout(() => {
-          if (!recognition.current || !shouldCapture.current) return;
-          try {
-            recognition.current.start();
-            setIsListening(true);
-          } catch {
-            // Ignore restart race conditions.
-          }
-        }, 250);
+        shouldCapture.current = false;
+        setIsCaptureMode(false);
+        if (onEnd) onEnd(latestTranscript.current);
+        latestTranscript.current = '';
       }
     };
 
-    rec.onerror = () => {
+    rec.onerror = (event) => {
       setIsListening(false);
+
+      // These are common during normal stop/restart cycles and should not alarm users.
+      if (event?.error === 'aborted' || event?.error === 'no-speech') {
+        if (shouldCapture.current) {
+          try {
+            recognition.current?.start();
+            setIsListening(true);
+            return;
+          } catch {
+            // Fall through to generic recovery.
+          }
+        }
+        return;
+      }
+
+      if (event?.error === 'audio-capture') {
+        if (onError) {
+          onError('No microphone was detected. Please connect/enable a mic and try again.');
+        }
+        return;
+      }
+
+      if (event?.error === 'network') {
+        if (onError) {
+          onError('Speech service had a temporary network issue. Please try again.');
+        }
+        return;
+      }
+
+      if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
+        if (onError) {
+          onError('Microphone permission was denied. Please enable microphone access in your browser settings.');
+        }
+        return;
+      }
+
+      if (onError) {
+        onError('Audio capture was interrupted. Please try again and speak clearly.');
+      }
     };
 
     return () => {
       rec.stop();
     };
-  }, [onResult, onEnd]);
+  }, [onResult, onEnd, onError]);
 
-  const startListening = () => {
+  const startListening = async () => {
     if (recognition.current && !shouldCapture.current) {
       shouldCapture.current = true;
       stopRequested.current = false;
+      latestTranscript.current = '';
       setIsCaptureMode(true);
       try {
         recognition.current.start();
-        setIsListening(true);
+        onResult('');
       } catch {
         setIsListening(false);
+        if (onError) {
+          onError('Unable to start microphone capture. Please retry.');
+        }
       }
     }
   };
@@ -124,15 +186,21 @@ export default function InterviewPage() {
     setTranscript(result);
   };
 
-  const handleSpeechEnd = async () => {
-    if (transcript.trim()) {
-      await sendResponse(transcript);
+  const handleSpeechEnd = async (finalTranscript) => {
+    const cleanedTranscript = String(finalTranscript || '').trim();
+    if (cleanedTranscript) {
+      await sendResponse(cleanedTranscript);
     }
+  };
+
+  const handleSpeechError = (message) => {
+    setError(message);
   };
 
   const { isListening, isCaptureMode, startListening, stopListening } = useSpeechRecognition({
     onResult: handleSpeechResult,
     onEnd: handleSpeechEnd,
+    onError: handleSpeechError,
   });
 
   useEffect(() => {
