@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { getCandidateAuth } from '@/lib/authStorage';
 
 const useSpeechRecognition = ({ onResult, onEnd, onError }) => {
@@ -195,7 +195,9 @@ const useSpeechRecognition = ({ onResult, onEnd, onError }) => {
 
 export default function InterviewPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const startListeningTimeoutRef = useRef(null);
+  const isInterviewRouteRef = useRef(true);
   const hasInitializedRef = useRef(false);
   const isSubmittingRef = useRef(false);
   const [candidateToken, setCandidateToken] = useState('');
@@ -211,13 +213,22 @@ export default function InterviewPage() {
   const TOTAL_QUESTIONS = 6;
   const THINKING_GAP_MS = 1800;
 
+  useEffect(() => {
+    isInterviewRouteRef.current = pathname === '/interview';
+  }, [pathname]);
+
   const speak = (text) => {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    if (!isInterviewRouteRef.current) return;
 
+    // Clear any queued/ongoing utterance before speaking the next prompt.
+    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.onend = () => {
+      if (!isInterviewRouteRef.current) return;
       setIsPreparingToListen(true);
       startListeningTimeoutRef.current = window.setTimeout(() => {
+        if (!isInterviewRouteRef.current) return;
         setIsPreparingToListen(false);
         startListening();
       }, THINKING_GAP_MS);
@@ -250,6 +261,9 @@ export default function InterviewPage() {
     return () => {
       if (startListeningTimeoutRef.current) {
         window.clearTimeout(startListeningTimeoutRef.current);
+      }
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
       }
     };
   }, []);
