@@ -10,6 +10,17 @@ The system evaluates communication-focused dimensions instead of deep math corre
 - Patience
 - Fluency
 
+ ## Deployment
+
+The app is deployed and live:
+
+- Frontend (Vercel): https://ai-tutor-screener-gules.vercel.app
+- Backend (Render): https://ai-tutor-screener-tzyh.onrender.com
+
+Frontend is configured to call the deployed backend API URL via 
+environment variables. Backend CORS is configured to allow the 
+deployed frontend origin.
+
 ## What This Project Solves
 
 Manual tutor screening calls are expensive, slow, and hard to scale. This app automates the first interview round by:
