@@ -196,6 +196,8 @@ const useSpeechRecognition = ({ onResult, onEnd, onError }) => {
 export default function InterviewPage() {
   const router = useRouter();
   const startListeningTimeoutRef = useRef(null);
+  const hasInitializedRef = useRef(false);
+  const isSubmittingRef = useRef(false);
   const [candidateToken, setCandidateToken] = useState('');
   const [session, setSession] = useState(null);
   const [currentQuestion, setCurrentQuestion] = useState('');
@@ -253,6 +255,9 @@ export default function InterviewPage() {
   }, []);
 
   useEffect(() => {
+    if (hasInitializedRef.current) return;
+    hasInitializedRef.current = true;
+
     const auth = getCandidateAuth();
     if (!auth?.token) {
       router.push('/login');
@@ -279,7 +284,9 @@ export default function InterviewPage() {
   }, [router]);
 
   const sendResponse = async (userTranscript) => {
-    if (!session?.sessionId || !candidateToken) return;
+    if (!session?.sessionId || !candidateToken || isSubmittingRef.current) return;
+
+    isSubmittingRef.current = true;
 
     setIsLoading(true);
     setError('');
@@ -326,6 +333,7 @@ export default function InterviewPage() {
     } catch (err) {
       setError(err.message);
     } finally {
+      isSubmittingRef.current = false;
       setIsLoading(false);
     }
   };
