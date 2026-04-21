@@ -15,9 +15,27 @@ import { ensureAdminUser } from './services/authService.js';
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+const allowedOrigins = (process.env.CLIENT_ORIGINS || 'http://localhost:3000')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:3000'
+  origin: (origin, callback) => {
+    // Allow non-browser requests (e.g. server-to-server, curl, health checks).
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error('Not allowed by CORS'));
+  },
 }));
 app.use(express.json());
 
