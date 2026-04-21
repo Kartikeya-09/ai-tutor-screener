@@ -326,10 +326,21 @@ export default function InterviewPage() {
         return;
       }
 
-      setCurrentQuestion(data.nextQuestion);
+      const nextPrompt = String(data.nextQuestion || '').trim();
+      if (!nextPrompt) {
+        throw new Error('Could not load the next question. Please restart the interview.');
+      }
+
+      setCurrentQuestion(nextPrompt);
       setInterviewMode(data.interviewMode || 'Exploring');
-      setQuestionIndex(Math.min(Number(data.coreQuestionNumber || 1), TOTAL_QUESTIONS));
-      speak(data.nextQuestion);
+      setQuestionIndex((prev) => {
+        const serverNumber = Number(data.coreQuestionNumber);
+        if (!Number.isNaN(serverNumber) && serverNumber > 0) {
+          return Math.min(serverNumber, TOTAL_QUESTIONS);
+        }
+        return Math.min(prev + 1, TOTAL_QUESTIONS);
+      });
+      speak(nextPrompt);
     } catch (err) {
       setError(err.message);
     } finally {
