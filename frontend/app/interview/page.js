@@ -9,8 +9,17 @@ const useSpeechRecognition = ({ onResult, onEnd, onError }) => {
   const shouldCapture = useRef(false);
   const stopRequested = useRef(false);
   const latestTranscript = useRef('');
+  const silenceTimer = useRef(null);
+  const submittedForTurn = useRef(false);
   const [isListening, setIsListening] = useState(false);
   const [isCaptureMode, setIsCaptureMode] = useState(false);
+
+  const clearSilenceTimer = () => {
+    if (silenceTimer.current) {
+      window.clearTimeout(silenceTimer.current);
+      silenceTimer.current = null;
+    }
+  };
 
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -23,7 +32,7 @@ const useSpeechRecognition = ({ onResult, onEnd, onError }) => {
 
     recognition.current = new SpeechRecognition();
     const rec = recognition.current;
-    rec.continuous = false;
+    rec.continuous = true;
     rec.interimResults = true;
     rec.lang = (typeof navigator !== 'undefined' && navigator.language) ? navigator.language : 'en-US';
 
@@ -51,6 +60,23 @@ const useSpeechRecognition = ({ onResult, onEnd, onError }) => {
 
       latestTranscript.current = nextTranscript;
       onResult(nextTranscript);
+
+      clearSilenceTimer();
+      if (shouldCapture.current && nextTranscript) {
+        silenceTimer.current = window.setTimeout(() => {
+          if (!recognition.current || !shouldCapture.current) return;
+
+          if (!submittedForTurn.current && onEnd) {
+            submittedForTurn.current = true;
+            onEnd(nextTranscript);
+          }
+
+          shouldCapture.current = false;
+          stopRequested.current = true;
+          setIsCaptureMode(false);
+          recognition.current.stop();
+        }, 1800);
+      }
     };
 
     rec.onend = () => {
@@ -59,17 +85,25 @@ const useSpeechRecognition = ({ onResult, onEnd, onError }) => {
       if (stopRequested.current) {
         stopRequested.current = false;
         setIsCaptureMode(false);
-        if (onEnd) onEnd(latestTranscript.current);
+        if (!submittedForTurn.current && onEnd) {
+          onEnd(latestTranscript.current);
+        }
         latestTranscript.current = '';
+        submittedForTurn.current = false;
+        clearSilenceTimer();
         return;
       }
 
-      // End of one speech turn. Submit captured transcript.
+      // Keep capture mode stable and restart recognition on benign end events.
       if (shouldCapture.current) {
-        shouldCapture.current = false;
-        setIsCaptureMode(false);
-        if (onEnd) onEnd(latestTranscript.current);
-        latestTranscript.current = '';
+        window.setTimeout(() => {
+          if (!recognition.current || !shouldCapture.current) return;
+          try {
+            recognition.current.start();
+          } catch {
+            // Ignore restart race conditions.
+          }
+        }, 200);
       }
     };
 
@@ -78,15 +112,6 @@ const useSpeechRecognition = ({ onResult, onEnd, onError }) => {
 
       // These are common during normal stop/restart cycles and should not alarm users.
       if (event?.error === 'aborted' || event?.error === 'no-speech') {
-        if (shouldCapture.current) {
-          try {
-            recognition.current?.start();
-            setIsListening(true);
-            return;
-          } catch {
-            // Fall through to generic recovery.
-          }
-        }
         return;
       }
 
@@ -117,6 +142,7 @@ const useSpeechRecognition = ({ onResult, onEnd, onError }) => {
     };
 
     return () => {
+      clearSilenceTimer();
       rec.stop();
     };
   }, [onResult, onEnd, onError]);
@@ -126,6 +152,8 @@ const useSpeechRecognition = ({ onResult, onEnd, onError }) => {
       shouldCapture.current = true;
       stopRequested.current = false;
       latestTranscript.current = '';
+      submittedForTurn.current = false;
+      clearSilenceTimer();
       setIsCaptureMode(true);
       try {
         recognition.current.start();
@@ -144,6 +172,7 @@ const useSpeechRecognition = ({ onResult, onEnd, onError }) => {
       shouldCapture.current = false;
       stopRequested.current = true;
       setIsCaptureMode(false);
+      clearSilenceTimer();
       recognition.current.stop();
       setIsListening(false);
     }
