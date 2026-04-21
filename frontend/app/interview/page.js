@@ -94,8 +94,20 @@ const useSpeechRecognition = ({ onResult, onEnd, onError }) => {
         return;
       }
 
-      // Keep capture mode stable and restart recognition on benign end events.
+      // If we already captured speech, treat this end event as end-of-answer and submit now.
       if (shouldCapture.current) {
+        const captured = String(latestTranscript.current || '').trim();
+        if (captured) {
+          shouldCapture.current = false;
+          setIsCaptureMode(false);
+          if (!submittedForTurn.current && onEnd) {
+            submittedForTurn.current = true;
+            onEnd(captured);
+          }
+          return;
+        }
+
+        // No transcript yet: keep capture mode stable and restart recognition.
         window.setTimeout(() => {
           if (!recognition.current || !shouldCapture.current) return;
           try {
