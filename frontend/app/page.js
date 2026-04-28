@@ -35,6 +35,7 @@ const requirements = [
   'Laptop or desktop with stable internet',
   'Working microphone and browser permissions',
   '8 to 12 minutes of uninterrupted time',
+  'After answering each question, please wait at least 30 seconds for the next question to load',
 ];
 
 const steps = [
@@ -198,6 +199,9 @@ export default function LandingPage() {
               Please authenticate first: <Link href="/register" className="font-semibold underline">Register</Link> or <Link href="/login" className="font-semibold underline">Login</Link>.
             </div>
           )}
+          <div className="mt-5 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800 font-medium">
+            Note: After finishing your answer, wait at least 30 seconds for the next question.
+          </div>
 
           <form onSubmit={handleStartInterview} className="mt-6 space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
