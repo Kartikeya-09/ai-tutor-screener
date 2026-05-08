@@ -138,8 +138,8 @@ Required `.env` keys in `backend/.env`:
 MONGO_URI=<your_mongodb_uri>
 PORT=5000
 JWT_SECRET=<your_jwt_secret>
-ADMIN_NAME=Cuemath Admin
-ADMIN_EMAIL=admin@cuemath.local
+ADMIN_NAME=BrightPath Admin
+ADMIN_EMAIL=admin@brightpath.local
 ADMIN_PASSWORD=<strong_password>
 ```
 

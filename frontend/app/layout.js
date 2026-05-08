@@ -14,7 +14,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata = {
-  title: "Cuemath AI Tutor Screener",
+  title: "BrightPath AI Tutor Screener",
   description: "Voice-first AI tutor screening interviews for faster, fair hiring.",
 };
 
